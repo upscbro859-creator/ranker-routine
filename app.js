@@ -3,7 +3,7 @@
    1) Fill in the two values below from Supabase → Project Settings → API
    ========================================================================= */
 const SUPABASE_URL = "https://jebuxabtlhejqezmgjpg.supabase.co";
-const SUPABASE_ANON_KEY = "https://jebuxabtlhejqezmgjpg.supabase.co/rest/v1/";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImplYnV4YWJ0bGhlanFlem1nanBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNzY1NzEsImV4cCI6MjA5Njc1MjU3MX0.wEI05WeRL8BKQggve0kvakEQvKzGl1nDrdNOD1RosJo";
 /* ========================================================================= */
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
