@@ -6,7 +6,7 @@ const SUPABASE_URL = "https://jebuxabtlhejqezmgjpg.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImplYnV4YWJ0bGhlanFlem1nanBnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNzY1NzEsImV4cCI6MjA5Njc1MjU3MX0.wEI05WeRL8BKQggve0kvakEQvKzGl1nDrdNOD1RosJo";
 /* ========================================================================= */
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let sb;
 const $ = (id) => document.getElementById(id);
 const app = $("app");
 let profile = null;
@@ -30,23 +30,51 @@ function computeStats(set) {
 }
 function inRange(all, range) { if (range === "all") return all; const days = { week: 7, month: 30, quarter: 90 }[range] ?? 9999; const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - days); return all.filter((e) => new Date(e.date + "T00:00") >= cutoff); }
 
-// ---- boot ----
-(async function () {
+// ---- boot: load the Supabase library reliably, then start ----
+function ensureSupabase(cb) {
+  if (window.supabase && window.supabase.createClient) { cb(); return; }
+  app.innerHTML = '<div class="empty">Loading…</div>';
+  var cdns = [
+    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.js",
+    "https://unpkg.com/@supabase/supabase-js@2.45.0/dist/umd/supabase.js",
+    "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+  ];
+  var i = 0;
+  function tryNext() {
+    if (i >= cdns.length) { app.innerHTML = '<div class="empty">Couldn\'t load the database library. Please check your internet connection and refresh the page.</div>'; return; }
+    var s = document.createElement("script");
+    s.src = cdns[i++];
+    s.onload = function () { (window.supabase && window.supabase.createClient) ? cb() : tryNext(); };
+    s.onerror = tryNext;
+    document.head.appendChild(s);
+  }
+  tryNext();
+}
+function start() {
   if (SUPABASE_URL.includes("YOUR-PROJECT")) {
     app.innerHTML = `<div class="empty">⚙️ Almost there — open <b>app.js</b> and paste your Supabase URL and anon key at the top (see README).</div>`;
     return;
   }
+  try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
+  catch (e) { app.innerHTML = '<div class="empty">Configuration problem with the Supabase URL or key. Double-check the two lines at the top of app.js.</div>'; return; }
   sb.auth.onAuthStateChange(() => loadSession());
   loadSession();
-})();
+}
+ensureSupabase(start);
 
 async function loadSession() {
-  const { data } = await sb.auth.getSession();
-  if (!data.session) { profile = null; renderAuth(); return; }
-  await sb.from("profiles").update({ last_seen: todayISO() }).eq("id", data.session.user.id);
-  const { data: p } = await sb.from("profiles").select("*").eq("id", data.session.user.id).maybeSingle();
-  profile = p ? { ...p, uid: data.session.user.id } : { uid: data.session.user.id, name: "Aspirant", role: "student" };
-  if (profile.role === "admin") renderAdmin(); else renderStudent("log");
+  try {
+    const { data } = await sb.auth.getSession();
+    if (!data || !data.session) { profile = null; renderAuth(); return; }
+    const uid = data.session.user.id;
+    try { await sb.from("profiles").update({ last_seen: todayISO() }).eq("id", uid); } catch (e) {}
+    let p = null;
+    try { const r = await sb.from("profiles").select("*").eq("id", uid).maybeSingle(); p = r.data; } catch (e) {}
+    profile = p ? { ...p, uid: uid } : { uid: uid, name: "Aspirant", role: "student" };
+    if (profile.role === "admin") renderAdmin(); else renderStudent("log");
+  } catch (e) {
+    profile = null; renderAuth();
+  }
 }
 
 // ---------------- AUTH ----------------
