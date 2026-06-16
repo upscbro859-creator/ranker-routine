@@ -87,7 +87,11 @@ function inRange(all, range) { if (range === "all") return all; const days = { w
 
 async function loadSession() {
   try {
-    const user = await SB.getUser();
+    const user = await Promise.race([
+      SB.getUser(),
+      new Promise((res) => setTimeout(() => res("__timeout"), 6000))
+    ]);
+    if (user === "__timeout") { profile = null; renderAuth(); return; }
     if (!user) { profile = null; renderAuth(); return; }
     touchLastSeen(user.id);
     let p = null; try { p = await getProfile(user.id); } catch (e) {}
@@ -207,14 +211,37 @@ function adminDetail(uid, name) {
 
 // ---------- REPORTS ----------
 const rangeState = {};
+function escH(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function fmtDay(iso) { try { return new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" }); } catch (e) { return iso; } }
+function dayTick(v) { return v === true ? '<b style="color:var(--good)">✓</b>' : v === false ? '<b style="color:var(--bad)">✕</b>' : '<span style="color:#bbb">·</span>'; }
+function dayCardHTML(e) {
+  const c = e.checklist || {};
+  const targets = (e.targets || []).filter(Boolean).map(escH);
+  return `<div class="daycard">
+    <div class="dayhead"><span class="dd">${fmtDay(e.date)}</span><span class="dm">${e.hours != null ? e.hours + "h" : "—"} · eff ${e.eff || "-"}/5 · ${e.pct != null ? e.pct + "%" : "—"}</span></div>
+    <div class="daychk">Revision ${dayTick(c.revision)} &nbsp;·&nbsp; DNA ${dayTick(c.dna)} &nbsp;·&nbsp; Topper ${dayTick(c.topper)}</div>
+    ${targets.length ? `<div class="dayrow"><b>Targets:</b> ${targets.join(" • ")}</div>` : ""}
+    ${e.tomorrow ? `<div class="dayrow"><b>Tomorrow:</b> ${escH(e.tomorrow)}</div>` : ""}
+    ${e.manifest ? `<div class="dayrow"><b>Manifestation:</b> ${escH(e.manifest)}</div>` : ""}
+  </div>`;
+}
 async function renderReport(container, uid, name, role) {
   container.innerHTML = '<div class="empty">Loading…</div>';
   const all = await entriesFor(uid);
   if (!all.length) { container.innerHTML = `<div class="empty">No entries yet for ${name}.</div>`; return; }
-  const range = rangeState[uid] || "week"; const set = inRange(all, range); const st = computeStats(set);
+  const range = rangeState[uid] || "week";
+  const rbtns = [["day", "Daily"], ["week", "Week"], ["month", "Month"], ["quarter", "3 Mo"], ["all", "All"]];
+  const pick = `<div class="rangepick">${rbtns.map((p) => `<button class="${range === p[0] ? "on" : ""}" data-r="${p[0]}">${p[1]}</button>`).join("")}</div>`;
+  if (range === "day") {
+    const days = all.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+    container.innerHTML = pick + `<div class="seclabel" style="margin-top:4px">Daily records${role === "admin" ? " — " + name : ""}</div><div class="daywrap">${days.map((e) => dayCardHTML(e)).join("")}</div>`;
+    container.querySelectorAll("[data-r]").forEach((b) => (b.onclick = () => { rangeState[uid] = b.getAttribute("data-r"); renderReport(container, uid, name, role); }));
+    return;
+  }
+  const set = inRange(all, range); const st = computeStats(set);
   const inset = inRange(all, range).sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-14);
   const maxH = Math.max(8, ...inset.map((e) => Number(e.hours) || 0));
-  container.innerHTML = `<div class="rangepick">${[["week","Week"],["month","Month"],["quarter","3 Mo"],["all","All"]].map((p) => `<button class="${range===p[0]?"on":""}" data-r="${p[0]}">${p[1]}</button>`).join("")}</div>
+  container.innerHTML = pick + `
     <div class="stats"><div class="stat"><div class="big">${st.avgHours.toFixed(1)}<small>h</small></div><div class="lbl">Avg / day</div></div><div class="stat"><div class="big">${st.totHours.toFixed(0)}<small>h</small></div><div class="lbl">Total hours</div></div><div class="stat"><div class="big">${st.avgEff.toFixed(1)}<small>/5</small></div><div class="lbl">Efficiency</div></div><div class="stat"><div class="big">${st.avgPct}<small>%</small></div><div class="lbl">Targets hit</div></div><div class="stat"><div class="big">${st.streak}<small>d</small></div><div class="lbl">Streak 🔥</div></div><div class="stat"><div class="big">${set.length}</div><div class="lbl">Days logged</div></div></div>
     <div class="chartcard"><h3>Study hours</h3><div class="barwrap">${inset.map((e) => `<div class="bar" style="height:${Math.round((100*(Number(e.hours)||0))/maxH)}%" title="${e.date}: ${e.hours||0}h"></div>`).join("")}</div><div class="barlbls">${inset.map((e) => `<span>${e.date.slice(8)}</span>`).join("")}</div></div>
     <div class="chartcard"><h3>Efficiency (1–5)</h3><div class="barwrap">${inset.map((e) => `<div class="bar eff" style="height:${Math.round((100*(e.eff||0))/5)}%" title="${e.date}: ${e.eff||"-"}/5"></div>`).join("")}</div><div class="barlbls">${inset.map((e) => `<span>${e.date.slice(8)}</span>`).join("")}</div></div>

@@ -132,3 +132,13 @@ input[type=range]{width:100%;accent-color:var(--orange);margin-top:8px}
 .hint{font-size:12px;color:var(--muted);margin-top:10px}
 
 @media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}.cohort{grid-template-columns:repeat(2,1fr)}.metrics{grid-template-columns:1fr}}
+
+/* Daily records view */
+.daywrap{display:flex;flex-direction:column;gap:10px}
+.daycard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:13px 15px;box-shadow:var(--shadow)}
+.daycard .dayhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:7px}
+.daycard .dd{font-family:'Fraunces',serif;font-weight:700;font-size:15px;color:var(--navy)}
+.daycard .dm{font-size:12px;font-weight:600;color:var(--orange);white-space:nowrap}
+.daycard .daychk{font-size:12px;color:var(--muted);margin-bottom:6px}
+.daycard .dayrow{font-size:13px;color:var(--navy);line-height:1.5;margin-top:3px}
+.daycard .dayrow b{color:var(--muted);font-weight:600}
